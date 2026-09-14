@@ -20,7 +20,7 @@ Scene :: struct {
     assets:             []Asset,
     renderables:        []Renderable,
     meshes:             []Mesh,
-    entities:       #soa[dynamic]Entity,
+        entities:       #soa[dynamic]Entity,
 }
 
 in_bounds :: proc(p: vec2, rect: Rect) -> bool {

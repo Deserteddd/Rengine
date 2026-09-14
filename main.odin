@@ -6,7 +6,6 @@ import "core:fmt"
 import lg "core:math/linalg"
 import rd "../Redef"
 import im "shared:imgui"
-
 import b3 "vendor:box3d"
 
 
@@ -42,27 +41,27 @@ g := struct {
 }
 
 main :: proc() {
+	// Init
     context.logger = log.create_console_logger()
-    init()
-    scene := load_scene("savefile")
-    run(&scene)
-    rd.destroy_window()
-}
-
-init :: proc() {
     ok := rd.create_window("Demo window", 1280, 720, ODIN_DEBUG); assert(ok)
     rd.set_relative_mouse_mode()
 
     init_renderer()
     init_imgui()
     init_physics()
-
-    add_player()
+    create_player()
 
     rd.set_vsync(g.vsync)
     g.player.fov = 90
     g.time = time.now()
     g.draw_aabbs = true
+    scene := load_scene("savefile")
+
+    // Run
+    run(&scene)
+
+    // Cleanup
+    rd.destroy_window()
 }
 
 run :: proc(scene: ^Scene) {
@@ -114,7 +113,9 @@ run :: proc(scene: ^Scene) {
                     }
                 case rd.MouseEvent:
                 #partial switch ev.type {
-                    case .LPress: g.lmb_click = true
+                    case .LPress: {
+                        g.lmb_click = true
+                    }
                     case .RPress: g.rmb_click = true
                 }
             }
@@ -131,32 +132,20 @@ run :: proc(scene: ^Scene) {
     }
 }
 
-update :: proc(scene: ^Scene) -> (exit: bool) {
-
+update :: proc(scene: ^Scene) {
 	b3.World_Step(g.world.world_id, g.dt, 4)
-	for &entity, i in scene.entities {
-		if entity.physics.b3 == {} {
-			fmt.println(entity.physics)
-		}
-		entity.physics.position = b3.Body_GetPosition(entity.physics.b3.body)
-		entity.physics.speed = b3.Body_GetLinearVelocity(entity.physics.b3.body)
 
-		// Remove long gone entities
-		if lg.distance(entity.physics.position, vec3{}) >= 500 {
-			remove_entity(scene, entity.id)
-		}
-    }
+	win_size := rd.get_window_size()
 
-    if !g.running {
+	 if !g.running {
         if g.lmb_click {
             mpos := rd.get_mouse_position()
-            win_size := rd.get_window_size()
             if mpos.x < 300 || mpos.x > win_size.x - 300 do return // Check click in viewport
             ray_origin, ray_dir := ray_from_screen(mpos, win_size)
             closest_hit: f32 = max(f32)
             closest_entity: EntityID
             for &entity in scene.entities {
-                ensure(entity.id != 0)
+               	assert(entity.id != 0)
                 intersection := ray_intersect_aabb(ray_origin, ray_dir, get_entity_aabb(entity))
                 if intersection != -1 && intersection < closest_hit {
                     closest_hit = intersection
@@ -171,10 +160,79 @@ update :: proc(scene: ^Scene) -> (exit: bool) {
         }
         return
     }
+
+
+    p := &g.player
 	update_camera()
    	update_player()
 
-	return
+
+    if g.lmb_click do spawn_entity(scene, "helmet", true, false)
+
+
+    origin, dir := ray_from_screen(win_size / 2, win_size)
+    closest_hit: f32 = max(f32)
+    closest_entity: EntityID
+    found_collision: bool
+    airborne_at_start := p.airborne
+	for &entity, i in scene.entities {
+        assert(b3.Body_IsValid(entity.physics.b3.body))
+        entity.physics.position = b3.Body_GetPosition(entity.physics.b3.body)
+        entity.physics.speed = b3.Body_GetLinearVelocity(entity.physics.b3.body)
+
+		// Remove far away entities
+		if lg.distance(entity.physics.position, vec3{}) >= 500 {
+			remove_entity(scene, entity.id)
+		}
+
+		// player_collision
+		aabb := get_entity_aabb(entity)
+		if aabbs_collide(p.bbox, aabb) && !p.noclip {
+            found_collision = true
+            mtv := resolve_aabb_collision_mtv(p.bbox, aabb)
+            for axis, j in mtv do if axis != 0 {
+                p.speed[j] *= 0.9
+                if j == 1 {
+                    if axis > 0 {
+                        p.airborne = false
+                    } else {
+                        p.speed.y = -0.1
+                    }
+                }
+            }
+            p.position += mtv
+            p.bbox.min += mtv
+            p.bbox.max += mtv
+        }
+
+        // Hit scan
+        intersection := ray_intersect_aabb(origin, dir, get_entity_aabb(entity))
+        if intersection != -1 && intersection < closest_hit {
+            closest_hit = intersection
+            closest_entity = entity.id
+        }
+
+        if g.rmb_click {
+            remove_entity(scene, closest_entity)
+        }
+    }
+
+    if !p.noclip {
+        if !found_collision do g.player.airborne = true
+
+        if !airborne_at_start && !p.airborne {
+            p.speed *= 0.8
+        }
+
+        if lg.length(p.speed.xz) > 20 do p.speed.xz *= 0.9
+    }
+
+
+
+
+
+
+
 }
 update_ :: proc(scene: ^Scene) -> (exit: bool) {
     if !g.running {
@@ -218,14 +276,14 @@ update_ :: proc(scene: ^Scene) -> (exit: bool) {
 
     win_size := rd.get_window_size()
     origin, dir := ray_from_screen(win_size / 2, win_size)
+    closest_entity: EntityID
     closest_hit: f32 = max(f32)
-    closest_entity_index := -1
     found_collision: bool
     airborne_at_start := p.airborne
 
     for &entity, i in scene.entities {
+        assert(entity.physics.b3 == {})
 
-        if entity.physics.b3 == {} do fmt.println(entity.asset_name)
         // Get aabb and check visibility
         aabb := get_entity_aabb(entity)
         entity.in_frustum = aabb_intersects_frustum(frustum,  aabb)
@@ -253,7 +311,7 @@ update_ :: proc(scene: ^Scene) -> (exit: bool) {
         intersection := ray_intersect_aabb(origin, dir, get_entity_aabb(entity))
         if intersection != -1 && intersection < closest_hit {
             closest_hit = intersection
-            closest_entity_index = i
+            closest_entity = entity.id
         }
     }
 
@@ -267,7 +325,7 @@ update_ :: proc(scene: ^Scene) -> (exit: bool) {
         if lg.length(p.speed.xz) > 20 do p.speed.xz *= 0.9
     }
 
-    if g.rmb_click do remove_entity_by_index(scene, closest_entity_index)
+    if g.rmb_click do remove_entity(scene, closest_entity)
 
     g.renderer.p_light.position = g.player.position + {0, 2, 0}
     return

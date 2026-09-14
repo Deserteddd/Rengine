@@ -2,6 +2,7 @@ package obj_viewer
 
 import "core:math"
 import "core:log"
+import b3 "vendor:box3d"
 import lg "core:math/linalg"
 import rd "../Redef"
 
@@ -13,11 +14,13 @@ Player :: struct {
     bbox:       AABB,
     airborne,
     noclip:     bool,
-    checkpoint: [2]vec3,                // Position, Rotation
+    checkpoint: [2]vec3, // Position, Rotation
+    body:	b3.BodyId,
+	hull:	b3.ShapeId,
 }
 
 create_player :: proc(pos: vec3 = 0, rotation: vec3 = 0) {
-    g.player = {
+	g.player = {
         position = pos,
         rotation = rotation,
         bbox = AABB {
@@ -27,6 +30,21 @@ create_player :: proc(pos: vec3 = 0, rotation: vec3 = 0) {
         checkpoint = {pos, rotation},
         fov = 90
     }
+
+	{	// Box3D part
+		w := &g.world
+		body_def := b3.DefaultBodyDef()
+		body_def.position = pos
+		g.player.body = b3.CreateBody(w.world_id, body_def)
+
+		player_box := b3.MakeCubeHull(1)
+
+		shape_def := b3.DefaultShapeDef()
+		shape_def.density = 1
+		shape_def.baseMaterial.friction = 0.3
+
+		g.player.hull = b3.CreateHullShape(g.player.body, shape_def, &player_box.base)
+	}
 }
 
 camera_position :: proc() -> vec3 {
@@ -40,39 +58,40 @@ get_player_translation :: proc() -> [2]vec3 {
     }
 }
 
+// Player movement inspiration: youtube.com/watch?v=gRqoXy-0d84
 update_player :: proc() {
     G :: 25
     p := &g.player
     dt := g.dt
     wishveloc := player_wish_speed()
     airborne_at_start := p.airborne
-    // if p.noclip {
+    if p.noclip {
         p.speed = 0
         delta_pos := wishveloc * f32(dt) * 16
         p.position += delta_pos
         p.bbox.min += delta_pos
         p.bbox.max += delta_pos
-    // } 
-    // else {
-    //     if wishveloc.y > 0 && !p.airborne {
-    //         p.speed.y = 9
-    //         p.airborne = true
-    //     } else if !p.airborne {
-    //         p.speed += wishveloc
-    //     } else {
-    //         air_accelerate(&wishveloc, f32(dt))
-    //         p.speed.y -= f32(G * dt)
-    //         p.speed.y = math.max(p.speed.y, -20)
-    //     }
-    //     delta_pos := p.speed * f32(dt)
-    //     p.position += delta_pos
-    //     p.bbox.min += delta_pos
-    //     p.bbox.max += delta_pos
-    // }
+    }
+    else {
+        if wishveloc.y > 0 && !p.airborne {
+            p.speed.y = 9
+            p.airborne = true
+        } else if !p.airborne {
+            p.speed += wishveloc
+        } else {
+            air_accelerate(&wishveloc, f32(dt))
+            p.speed.y -= f32(G * dt)
+            p.speed.y = math.max(p.speed.y, -20)
+        }
+        delta_pos := p.speed * f32(dt)
+        p.position += delta_pos
+        p.bbox.min += delta_pos
+        p.bbox.max += delta_pos
+    }
 }
 
 reset_player_pos :: proc(at_origin := false) {
-    if at_origin do g.player.position = 0; 
+    if at_origin do g.player.position = 0;
     else if g.player.checkpoint.x == 0 {
         g.player.position = g.player.checkpoint.x
     } else {
@@ -96,7 +115,7 @@ player_wish_speed :: proc() -> vec3 {
     yaw_cos := math.cos(math.to_radians(g.player.rotation.y))
     yaw_sin := math.sin(math.to_radians(g.player.rotation.y))
 
-    wish_speed.y = u * f32(int(!g.player.airborne)) - d
+    wish_speed.y = u * f32(int(!g.player.airborne))
     if g.player.noclip do wish_speed.y = u-d
     wish_speed.x += (lr * yaw_cos - fb * yaw_sin)
     wish_speed.z += (lr * yaw_sin + fb * yaw_cos)

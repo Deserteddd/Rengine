@@ -120,7 +120,6 @@ load_scene :: proc(path: string) -> Scene {
 			),
 			aabb     = serialized.physics.aabb,
 		}
-		add_physics_body(&entity)
 
 		for asset, index in scene.assets {
 			if asset.name == serialized.asset {
@@ -130,6 +129,7 @@ load_scene :: proc(path: string) -> Scene {
 				break
 			}
 		}
+		add_physics_body(&entity)
 		return entity
 	}
 

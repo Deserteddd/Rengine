@@ -108,7 +108,6 @@ init_renderer :: proc() {
 
 compile_shaders :: proc() {
 	r := &g.renderer
-
     defer free_all(context.temp_allocator)
     load_shader :: proc(path: string, loc := #caller_location) -> []byte {
         data, err := os.read_entire_file_from_path(path, context.temp_allocator)

@@ -6,7 +6,7 @@ import lg "core:math/linalg"
 import rand "core:math/rand"
 import rd "../Redef"
 
-EntityID :: distinct u32
+EntityID :: distinct i32
 
 
 Entity :: struct {
@@ -61,14 +61,18 @@ Mesh :: struct {
 }
 
 used_ids: map[EntityID]bool
+import b3 "vendor:box3d"
+spawn_entity :: proc(scene: ^Scene, asset: string, under_player: bool, shoot: bool, loc := #caller_location) -> EntityID {
+    id := entity_from_asset(scene, asset)
+    if id < 0 do return -1
 
-spawn_entity :: proc(scene: ^Scene, asset: string, under_player: bool, shoot: bool) -> (index: int) {
-    index = entity_from_asset(scene, asset)
-    if index == -1 do return
+    index := entity_index(scene, id)
+    assert(index >= 0, loc = loc)
     entity := scene.entities[index]
     defer scene.entities[index] = entity
+    assert(b3.Body_IsValid(entity.physics.b3.body), loc = loc)
     if under_player {
-        entity.physics.position = get_player_translation().x - {0, get_entity_aabb(entity).max.y, 0}
+        entity.physics.position = get_player_translation().x - {0, get_entity_aabb(entity).max.y + 0.01, 0}
     } else {
         screen_size := rd.get_window_size()
         origin, dir := ray_from_screen(screen_size/2, screen_size)
@@ -76,33 +80,31 @@ spawn_entity :: proc(scene: ^Scene, asset: string, under_player: bool, shoot: bo
         if shoot {
             entity.physics.speed = 20*dir
             entity.physics.dyn = true
-        } else {
-            entity.physics.position += 10*dir
         }
+        entity.physics.position += 1.5*dir
     }
+
+    assert(b3.Body_IsValid(entity.physics.b3.body), loc = loc)
     add_physics_body(&entity)
-    return
+
+    return entity.id
 }
 
 
 remove_entity :: proc(scene: ^Scene, id: EntityID) -> bool {
-    index := entity_index(scene, id)
-    return remove_entity_by_index(scene, index)
-}
-
-remove_entity_by_index :: proc(scene: ^Scene, index: int) -> bool {
+	index := entity_index(scene, id)
     if index < 0 || index >= len(scene.entities) do return false
     entity := scene.entities[index]
     id := entity.id
-    assert(used_ids[id] == true)
     destroy_physics_body(&entity)
-    ordered_remove_soa(&scene.entities, index)
+    unordered_remove_soa(&scene.entities, index)
+    assert(used_ids[id] == true)
     used_ids[id] = false
     return true
 }
 
-entity_index :: proc(scene: ^Scene, id: EntityID) -> int {
-    if id == 0 do return -1
+entity_index :: proc(scene: ^Scene, id: EntityID, loc := #caller_location) -> int {
+    if id < 0 do return -1
     for e, i in scene.entities {
         if e.id == id do return i
     }
@@ -110,7 +112,8 @@ entity_index :: proc(scene: ^Scene, id: EntityID) -> int {
 }
 
 // Returns: index in entities array, -1 on failure
-entity_from_asset :: proc(scene: ^Scene, asset_name: string, entity_name: string = "") -> (index: int) {
+@(private = "file")
+entity_from_asset :: proc(scene: ^Scene, asset_name: string, entity_name: string = "", loc := #caller_location) -> EntityID {
     entity: Entity
     for asset, i in scene.assets {
         if asset.name == asset_name {
@@ -122,8 +125,7 @@ entity_from_asset :: proc(scene: ^Scene, asset_name: string, entity_name: string
         }
     }
     if entity == {} do return -1
-    ids := slice.from_ptr(scene.entities.id, len(scene.entities))
-    id := lowest_free_id(scene)
+    id := get_free_id(scene)
 
     if entity_name == "" do entity.name = fmt.aprintf("%v-%v", asset_name, id)
     else do entity.name = entity_name
@@ -132,12 +134,16 @@ entity_from_asset :: proc(scene: ^Scene, asset_name: string, entity_name: string
     entity.physics.scale = 1
     entity.physics.rotation = lg.QUATERNIONF32_IDENTITY
 
+    assert(!b3.Body_IsValid(entity.physics.b3.body), loc = loc)
+    add_physics_body(&entity)
+    assert(b3.Body_IsValid(entity.physics.b3.body), loc = loc)
+
     assert(used_ids[id] == false)
-    append_soa(&scene.entities, entity)
+    append(&scene.entities, entity)
     used_ids[id] = true
-    index = len(scene.entities)-1
-    return
+    return entity.id
 }
+
 
 get_entity_aabb :: #force_inline proc(entity: Entity) -> AABB {
     return AABB {
@@ -148,9 +154,9 @@ get_entity_aabb :: #force_inline proc(entity: Entity) -> AABB {
 
 
 @(private = "file")
-lowest_free_id :: proc(scene: ^Scene) -> EntityID {
+get_free_id :: proc(scene: ^Scene) -> EntityID {
     for {
-        id := EntityID(rand.uint32())
+        id := EntityID(rand.int31())
         if used_ids[id] do continue
         return id
     }

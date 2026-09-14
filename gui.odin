@@ -20,7 +20,6 @@ init_imgui :: proc() {
 	ok := im_win32.Init(auto_cast rd.g.window.handle); assert(ok)
 	ok = im_d3d11.Init(rd.g.graphics.device, rd.g.graphics.ctx); assert(ok)
 }
-import "core:log"
 
 draw_imgui :: proc(scene: ^Scene) {
 	io := im.GetIO()
@@ -68,8 +67,7 @@ draw_imgui :: proc(scene: ^Scene) {
         im.SetWindowSize({rect.w, rect.h})
         if im.BeginTabBar("##") {
             defer im.EndTabBar()
-            selected_entity_index := -1
-            entities_tab(scene, rect, &selected_entity_index)
+            entities_tab(scene, rect)
 
             selected_material_index := -1
             materials_tab(scene, rect, &selected_material_index)
@@ -133,7 +131,8 @@ materials_tab :: proc(scene: ^Scene, rect: Rect, selected_material_index: ^int) 
     }
 }
 
-entities_tab :: proc(scene: ^Scene, rect: Rect, selected_entity_index: ^int) {
+entities_tab :: proc(scene: ^Scene, rect: Rect) {
+	selected_entity_index := entity_index(scene, g.selected_entity)
     // Entities Tab
     if im.BeginTabItem("Entities") {
         defer im.EndTabItem()
@@ -148,41 +147,30 @@ entities_tab :: proc(scene: ^Scene, rect: Rect, selected_entity_index: ^int) {
                 }
                 if selected {
                     // im.ScrollToItem()
-                    selected_entity_index^ = i
+                    selected_entity_index = i
                 }
                 im.PopID()
             }
             im.EndListBox()
         }
         // Selected entity options
-        if selected_entity_index^ != -1 && im.BeginChild("Lapsonen") {
-        	selected_index := selected_entity_index^
-	        s := scene.entities[selected_index]
+        if selected_entity_index > 0 && im.BeginChild("Lapsonen") {
+	        s := scene.entities[selected_entity_index]
             defer {
-	            scene.entities[selected_index] = s // Dumb hack to work with soa pointers
             	im.EndChild()
              	for &axis in s.physics.scale do axis = max(0.01, axis)
             }
             im.Separator()
             im.LabelText("", "Physics")
             if im.DragFloat3("Position", &s.physics.position, 0.01) {
-            	set_physics_position(&s)
+            	set_physics_transform(&s)
             }
             im.DragFloat3("Scale",    &s.physics.scale, 0.01)
             im.Separator()
             if im.Button("Delete") {
-                ok := remove_entity(scene, g.selected_entity)
+                ok := remove_entity(scene, s.id)
                 assert(ok)
-            }
-            if im.Button("Duplicate") {
-                index := entity_from_asset(scene, s.asset_name)
-                offset := s.physics.aabb.min * 2 * s.physics.scale
-                scene.entities[index].physics = s.physics
-                scene.entities[index].physics.position += {offset.x, 0, 0}
-                scene.entities[index].in_frustum = true
-
-
-                g.selected_entity = scene.entities[index].id
+                return
             }
 
             if im.Checkbox("Dynamic", &s.physics.dyn) do add_physics_body(&s)
@@ -218,7 +206,7 @@ entities_tab :: proc(scene: ^Scene, rect: Rect, selected_entity_index: ^int) {
                 if enabled do im.SliderFloat("###", &s.material_overrides.roughness, 0, 1);
             }
 
-
+	        scene.entities[selected_entity_index] = s // Dumb hack to work with soa pointers
         }
     }
 }
