@@ -2,7 +2,6 @@ package obj_viewer
 
 import "core:math"
 import "core:log"
-import b3 "vendor:box3d"
 import lg "core:math/linalg"
 import rd "../Redef"
 
@@ -15,8 +14,6 @@ Player :: struct {
     airborne,
     noclip:     bool,
     checkpoint: [2]vec3, // Position, Rotation
-    body:	b3.BodyId,
-	hull:	b3.ShapeId,
 }
 
 create_player :: proc(pos: vec3 = 0, rotation: vec3 = 0) {
@@ -30,21 +27,6 @@ create_player :: proc(pos: vec3 = 0, rotation: vec3 = 0) {
         checkpoint = {pos, rotation},
         fov = 90
     }
-
-	{	// Box3D part
-		w := &g.world
-		body_def := b3.DefaultBodyDef()
-		body_def.position = pos
-		g.player.body = b3.CreateBody(w.world_id, body_def)
-
-		player_box := b3.MakeCubeHull(1)
-
-		shape_def := b3.DefaultShapeDef()
-		shape_def.density = 1
-		shape_def.baseMaterial.friction = 0.3
-
-		g.player.hull = b3.CreateHullShape(g.player.body, shape_def, &player_box.base)
-	}
 }
 
 camera_position :: proc() -> vec3 {
@@ -62,12 +44,11 @@ get_player_translation :: proc() -> [2]vec3 {
 update_player :: proc() {
     G :: 25
     p := &g.player
-    dt := g.dt
     wishveloc := player_wish_speed()
     airborne_at_start := p.airborne
     if p.noclip {
         p.speed = 0
-        delta_pos := wishveloc * f32(dt) * 16
+        delta_pos := wishveloc * f32(g.dt) * 16
         p.position += delta_pos
         p.bbox.min += delta_pos
         p.bbox.max += delta_pos
@@ -79,11 +60,11 @@ update_player :: proc() {
         } else if !p.airborne {
             p.speed += wishveloc
         } else {
-            air_accelerate(&wishveloc, f32(dt))
-            p.speed.y -= f32(G * dt)
+            air_accelerate(&wishveloc, f32(g.dt))
+            p.speed.y -= f32(G * g.dt)
             p.speed.y = math.max(p.speed.y, -20)
         }
-        delta_pos := p.speed * f32(dt)
+        delta_pos := p.speed * f32(g.dt)
         p.position += delta_pos
         p.bbox.min += delta_pos
         p.bbox.max += delta_pos

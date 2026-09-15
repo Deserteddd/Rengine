@@ -16,12 +16,6 @@ to_radians :: math.to_radians_f32
 
 abs :: lg.abs
 
-Scene :: struct {
-    assets:             []Asset,
-    renderables:        []Renderable,
-    meshes:             []Mesh,
-        entities:       #soa[dynamic]Entity,
-}
 
 in_bounds :: proc(p: vec2, rect: Rect) -> bool {
     return p.x >= rect.x && p.x < rect.x + rect.w && p.y >= rect.y && p.y < rect.y + rect.h

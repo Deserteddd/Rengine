@@ -118,7 +118,7 @@ load_asset_data :: proc(path: string, allocator := context.allocator) -> (AssetD
     return data, true
 }
 
-create_mesh :: proc(asset: Asset) -> Mesh {
+create_mesh :: proc(asset: Asset, allocator := context.allocator) -> Mesh {
     tris := make([][3]vec3, len(asset.data.indices)/3)
     indices := asset.data.indices
     verts := asset.data.vertices

@@ -29,6 +29,7 @@ draw_imgui :: proc(scene: ^Scene) {
 	im_win32.NewFrame()
     im_d3d11.NewFrame()
     im.NewFrame()
+
     if im.Begin("Left panel", nil, {.NoTitleBar, .NoResize, .NoMove}) {
         defer im.End()
         im.SetWindowPos({0, 0})

@@ -7,8 +7,6 @@ import "core:time"
 import "core:log"
 import "core:os"
 
-
-
 PointLight :: struct {
 	position: vec3,
 	power:    f32,
@@ -38,6 +36,29 @@ Camera :: struct {
 	yaw:      f32,
 }
 
+MaterialID :: distinct u32
+
+MaterialAttribute :: enum {
+    Color,
+    Metallic,
+    Roughness,
+}
+
+MaterialCollection :: struct {
+    id:             MaterialID,
+    params:         []Material,
+    params_buffer:  rd.StructuredBuffer,
+    textures:       rd.TextureBuffer,
+}
+
+Renderable :: struct {
+    vbo:            rd.VertexBuffer,
+    ibo:            rd.IndexBuffer,
+    materials:      MaterialCollection,
+    aabb:           rd.VertexBuffer,
+    primitives:     []Primitive,
+}
+
 
 Renderer :: struct {
 	vs_ui:            rd.VertexShader,
@@ -52,6 +73,8 @@ Renderer :: struct {
 	ps_aabb:          rd.PixelShader,
 	vs_ocean:         rd.VertexShader,
 	ps_ocean:         rd.PixelShader,
+	ps_fog:  		  rd.PixelShader,
+
 	fallback_texture: rd.Texture,
 	skybox_texture:   rd.TextureCube,
 	p_light:          PointLight,
@@ -60,7 +83,6 @@ Renderer :: struct {
 	plane:			  Plane,
 	font_atlases:	  [FontSize]rd.Texture,
 
-	ps_fog:  		  rd.PixelShader,
 
     options: struct {
         fog: bool,
@@ -194,7 +216,7 @@ create_render_object :: proc(asset: ^Asset) -> Renderable {
 	return ro
 }
 
-create_frag_ubo :: #force_inline proc() -> FragUBOGlobal {
+create_frag_ubo :: proc() -> FragUBOGlobal {
 	return FragUBOGlobal {
 		view_pos = camera_position(),
 		light_pos = g.renderer.p_light.position,

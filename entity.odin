@@ -1,10 +1,10 @@
 package obj_viewer
 
 import "core:fmt"
-import "core:slice"
 import lg "core:math/linalg"
 import rand "core:math/rand"
 import rd "../Redef"
+import b3 "vendor:box3d"
 
 EntityID :: distinct i32
 
@@ -26,42 +26,20 @@ Entity :: struct {
     in_frustum: bool
 }
 
-MaterialID :: distinct u32
 
-MaterialAttribute :: enum {
-    Color,
-    Metallic,
-    Roughness,
-}
-
-MaterialCollection :: struct {
-    id:             MaterialID,
-    params:         []Material,
-    params_buffer:  rd.StructuredBuffer,
-    textures:       rd.TextureBuffer,
-}
-
-Renderable :: struct {
-    vbo:            rd.VertexBuffer,
-    ibo:            rd.IndexBuffer,
-    materials:      MaterialCollection,
-    aabb:           rd.VertexBuffer,
-    primitives:     []Primitive,
-}
 
 AABB :: struct {
     min: vec3,
     max: vec3
 }
 
-
-
+// This isn't really used anywhere, but will become useful at some point (tri collision)
 Mesh :: struct {
     tris: [][3]vec3
 }
 
 used_ids: map[EntityID]bool
-import b3 "vendor:box3d"
+
 spawn_entity :: proc(scene: ^Scene, asset: string, under_player: bool, shoot: bool, loc := #caller_location) -> EntityID {
     id := entity_from_asset(scene, asset)
     if id < 0 do return -1
@@ -70,7 +48,7 @@ spawn_entity :: proc(scene: ^Scene, asset: string, under_player: bool, shoot: bo
     assert(index >= 0, loc = loc)
     entity := scene.entities[index]
     defer scene.entities[index] = entity
-    assert(b3.Body_IsValid(entity.physics.b3.body), loc = loc)
+    assert(b3.Body_IsValid(entity.physics.b3_body), loc = loc)
     if under_player {
         entity.physics.position = get_player_translation().x - {0, get_entity_aabb(entity).max.y + 0.01, 0}
     } else {
@@ -84,7 +62,7 @@ spawn_entity :: proc(scene: ^Scene, asset: string, under_player: bool, shoot: bo
         entity.physics.position += 1.5*dir
     }
 
-    assert(b3.Body_IsValid(entity.physics.b3.body), loc = loc)
+    assert(b3.Body_IsValid(entity.physics.b3_body), loc = loc)
     add_physics_body(&entity)
 
     return entity.id
@@ -134,9 +112,9 @@ entity_from_asset :: proc(scene: ^Scene, asset_name: string, entity_name: string
     entity.physics.scale = 1
     entity.physics.rotation = lg.QUATERNIONF32_IDENTITY
 
-    assert(!b3.Body_IsValid(entity.physics.b3.body), loc = loc)
+    assert(!b3.Body_IsValid(entity.physics.b3_body), loc = loc)
     add_physics_body(&entity)
-    assert(b3.Body_IsValid(entity.physics.b3.body), loc = loc)
+    assert(b3.Body_IsValid(entity.physics.b3_body), loc = loc)
 
     assert(used_ids[id] == false)
     append(&scene.entities, entity)
