@@ -4,7 +4,7 @@
 
 This project is an early in development game engine. It currently works like this:
 
-1. Initialize core systems like the platform abstraction layer, renderer and
+1. Initialize core systems like the platform abstraction layer, renderer and the physics engine.
 
 2. Take in preprocessed asset binaries (the preprocessor is a separate project vibecoded in Rust) and a JSON-savefile describing serialized entities and some miscellanious data, and construct a scene from them.
 
