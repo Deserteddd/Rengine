@@ -1,11 +1,14 @@
 package obj_viewer
 
 
-import rd "../Redef"
-import lg "core:math/linalg"
 import "core:time"
 import "core:log"
 import "core:os"
+import "core:hash"
+import "core:slice"
+import rd "../Redef"
+import lg "core:math/linalg"
+
 
 PointLight :: struct {
 	position: vec3,
@@ -13,6 +16,7 @@ PointLight :: struct {
 	color:    vec3,
 }
 
+// This is used in every draw call with the gfx pipeline
 FragUBOGlobal :: struct {
 	light_pos:       vec3,
 	_:               f32,
@@ -101,6 +105,7 @@ init_renderer :: proc() {
 	r.quad = init_quad()
 	r.crosshair =  load_sprite("assets/images/crosshair.png")
 
+    // Currently relying on texture maps to draw text
 	r.font_atlases = {
 		._8  = load_sprite("assets/images/DejaVu Sans Mono-8.png"),
 		._10 = load_sprite("assets/images/DejaVu Sans Mono-10.png"),
@@ -108,7 +113,6 @@ init_renderer :: proc() {
 		._14 = load_sprite("assets/images/DejaVu Sans Mono-14.png"),
 		._16 = load_sprite("assets/images/DejaVu Sans Mono-16.png"),
 	}
-
 
 
 	r.skybox_texture = load_cubemap_texture(
@@ -122,6 +126,7 @@ init_renderer :: proc() {
 		},
 	)
 
+    // Naming is a bit misleading. This is used for the ocean.
 	r.plane = new_plane(200)
 
 	r.p_light.color = 1
@@ -184,9 +189,7 @@ compile_shaders :: proc() {
 	compile_ps(&r.ps_fog, shader_2D, "ps_fog")
 }
 
-import "core:hash"
-import "core:slice"
-
+// Create a Renderable for an asset
 create_render_object :: proc(asset: ^Asset) -> Renderable {
 	assert(asset != nil)
 	ro: Renderable
@@ -256,15 +259,12 @@ draw_scene :: proc(scene: ^Scene) {
 				entity.physics.scale,
 			)
 
-			// material_overrides := transmute(u32)entity.material_overrides
-            // rd.push_constant_data(.Pixel, &material_overrides, 2)
 			rd.push_constant_data(.Vertex, &model_matrix, 1)
 			for &primitive in ro.primitives {
 				rd.push_constant_data(.Pixel, &primitive.material_id, 1)
 				rd.draw_indexed(primitive.index_start, primitive.index_count)
 			}
 
-			// Selected entity's
 			if !g.running && g.selected_entity == entity.id {
 				rd.bind(&g.renderer.vs_aabb); defer rd.bind(&g.renderer.vs_gfx)
 				rd.bind(&g.renderer.ps_aabb); defer rd.bind(&g.renderer.ps_gfx)
@@ -330,7 +330,6 @@ draw_aabbs :: proc(scene: ^Scene) {
 
     for entity in scene.entities {
         if entity.renderable == nil do continue
-        // if !entity.in_frustum do continue
 
         rd.bind(&entity.renderable.aabb);
         model_matrix := lg.matrix4_from_trs(
@@ -346,6 +345,11 @@ draw_aabbs :: proc(scene: ^Scene) {
 }
 
 import d3d "vendor:directx/d3d11"
+
+/*
+This is used to create the distance fog. It's a post process effect that samples the depth texture
+created during the main pass and blends gray to the output texture accordingly.
+*/
 post_process :: proc() {
 
 	// Apply fog
@@ -385,13 +389,10 @@ post_process :: proc() {
     }
 }
 
-
-
 get_furustum_planes :: proc(vp: matrix[4, 4]f32) -> [6]vec4 {
 	t := lg.transpose(vp)
 	return {t[3] + t[0], t[3] + t[0], t[3] + t[1], t[3] + t[1], t[3] + t[2], t[3] + t[2]}
 }
-
 
 create_view_matrix :: proc() -> lg.Matrix4f32 {
 	pitch_matrix := lg.matrix4_rotate_f32(to_radians(g.player.rotation.x), {1, 0, 0})

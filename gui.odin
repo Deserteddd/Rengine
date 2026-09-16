@@ -147,7 +147,6 @@ entities_tab :: proc(scene: ^Scene, rect: Rect) {
                     g.selected_entity = e.id
                 }
                 if selected {
-                    // im.ScrollToItem()
                     selected_entity_index = i
                 }
                 im.PopID()

@@ -60,6 +60,7 @@ init_physics :: proc() {
     assert(b3.World_IsValid(g.world.id))
 }
 
+// Creates a Box3D body for an entity
 add_physics_body :: proc(e: ^Entity, loc := #caller_location) {
     assert(b3.World_IsValid(g.world.id), loc = loc)
     if e.physics.b3_body != {} {
@@ -84,7 +85,7 @@ add_physics_body :: proc(e: ^Entity, loc := #caller_location) {
     assert(b3.Shape_IsValid(e.physics.b3_hull))
 }
 
-
+// Sets the Box3D position, rotation and velocity for an entity
 set_physics_transform :: proc(e: ^Entity, loc := #caller_location) {
     assert(b3.World_IsValid(g.world.id), loc = loc)
     assert(b3.Body_IsValid(e.physics.b3_body), loc = loc)

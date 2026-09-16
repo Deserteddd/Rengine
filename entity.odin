@@ -27,13 +27,12 @@ Entity :: struct {
 }
 
 
-
 AABB :: struct {
     min: vec3,
     max: vec3
 }
 
-// This isn't really used anywhere, but will become useful at some point (tri collision)
+// This isn't really used anywhere, but will become useful at some point (triangle based collisions for example)
 Mesh :: struct {
     tris: [][3]vec3
 }
@@ -122,7 +121,7 @@ entity_from_asset :: proc(scene: ^Scene, asset_name: string, entity_name: string
     return entity.id
 }
 
-
+// The AABB of an entity is not moved with the entity. Instead it's position is calculated on demand.
 get_entity_aabb :: #force_inline proc(entity: Entity) -> AABB {
     return AABB {
         min = entity.physics.aabb.min * entity.physics.scale + entity.physics.position,
