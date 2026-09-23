@@ -43,7 +43,8 @@ g := struct {
 main :: proc() {
 	// Init
     context.logger = log.create_console_logger()
-    ok := rd.create_window("Demo window", 1920  , 1080, ODIN_DEBUG); assert(ok)
+    info := rd.get_monitor_info()
+    ok := rd.create_window("Demo window", info.work_area.x, info.work_area.y, ODIN_DEBUG); assert(ok)
     rd.set_relative_mouse_mode()
 
     init_renderer()

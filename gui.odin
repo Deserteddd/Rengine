@@ -7,6 +7,8 @@ import im "shared:imgui"
 import im_d3d11 "shared:imgui/imgui_impl_dx11"
 import im_win32 "shared:imgui/imgui_impl_win32"
 
+GUI_SCALE :: 1.5
+
 init_imgui :: proc() {
     assert(rd.g.graphics_init)
     if g.ui_context != nil {
@@ -19,6 +21,8 @@ init_imgui :: proc() {
     g.ui_context = im.CreateContext()
 	ok := im_win32.Init(auto_cast rd.g.window.handle); assert(ok)
 	ok = im_d3d11.Init(rd.g.graphics.device, rd.g.graphics.ctx); assert(ok)
+    io := im.GetIO()
+    io.FontGlobalScale = GUI_SCALE
 }
 
 draw_imgui :: proc(scene: ^Scene) {
@@ -33,7 +37,7 @@ draw_imgui :: proc(scene: ^Scene) {
     if im.Begin("Left panel", nil, {.NoTitleBar, .NoResize, .NoMove}) {
         defer im.End()
         im.SetWindowPos({0, 0})
-        im.SetWindowSize({300, io.DisplaySize.y})
+        im.SetWindowSize({300*GUI_SCALE, io.DisplaySize.y})
         if im.BeginTabBar("PropertiesTabs") {
             defer im.EndTabBar()
 
@@ -63,7 +67,7 @@ draw_imgui :: proc(scene: ^Scene) {
         }
     }
 	if im.Begin("Right panel", nil, {.NoTitleBar, .NoResize, .NoMove}) {
-		rect := Rect{f32(io.DisplaySize.x)-300, 0, 300, f32(io.DisplaySize.y)}
+		rect := Rect{f32(io.DisplaySize.x)-300*GUI_SCALE, 0, 300*GUI_SCALE, f32(io.DisplaySize.y)}
         im.SetWindowPos({io.DisplaySize.x-rect.w, 0})
         im.SetWindowSize({rect.w, rect.h})
         if im.BeginTabBar("##") {
